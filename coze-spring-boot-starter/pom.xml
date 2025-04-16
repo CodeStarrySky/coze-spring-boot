@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.wuch</groupId>
+        <artifactId>coze-spring-boot</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>coze-spring-boot-starter</artifactId>
+    <name>coze-spring-boot-starter</name>
+    <description>Coze Spring Boot Starter</description>
+    <packaging>jar</packaging>
+
+<!--    <url></url>-->
+<!--    <scm>-->
+<!--        <url></url>-->
+<!--        <connection></connection>-->
+<!--        <developerConnection></developerConnection>-->
+<!--    </scm>-->
+
+    <dependencies>
+        <dependency>
+            <groupId>com.wuch</groupId>
+            <artifactId>coze-spring-boot-autoconfigure</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+    </dependencies>
+
+</project>
