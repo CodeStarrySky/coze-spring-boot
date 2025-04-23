@@ -1,0 +1,21 @@
+server:
+  port: 9000
+spring:
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    static-path-pattern: /static/**
+  thymeleaf:
+    cache: false
+  redis:
+    host: * * * * *
+    port: 6379
+    password: * * * * *
+
+coze:
+  token: * * * * *
+  botId: * * * * *
+  baseUrl: https://api.coze.cn
+  readTimeout: 100000
+  connectTimeout: 100000

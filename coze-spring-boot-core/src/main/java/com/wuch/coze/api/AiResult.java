@@ -31,6 +31,12 @@ public class AiResult {
         return result;
     }
 
+    public static AiResult onlyMessage(String msg) {
+        AiResult result = new AiResult();
+        result.setMessage(msg);
+        return result;
+    }
+
     public String toJson() {
         return JSON.toJSONString(this);
     }

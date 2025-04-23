@@ -4,19 +4,26 @@ import com.coze.openapi.service.auth.TokenAuth;
 import com.coze.openapi.service.service.CozeAPI;
 import com.wuch.coze.api.ChatClient;
 import com.wuch.coze.api.CozeProperties;
+import com.wuch.coze.memory.DataMemory;
+import com.wuch.coze.memory.DefaultDataMemory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.boot.autoconfigure.AutoConfigureOrder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 @ConditionalOnClass(CozeAPI.class)
 @EnableConfigurationProperties(CozeProperties.class)
 @RequiredArgsConstructor
+@AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
 public class CozeAutoConfiguration {
 
     private final CozeProperties properties;
@@ -35,10 +42,17 @@ public class CozeAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public ChatClient chatClient(CozeAPI cozeAPI, ApplicationContext applicationContext, StringRedisTemplate stringRedisTemplate) {
-        return new ChatClient(applicationContext, cozeAPI, stringRedisTemplate, properties);
+    @Order
+    public ChatClient chatClient(CozeAPI cozeAPI, ApplicationContext applicationContext, DefaultListableBeanFactory beanFactory, DataMemory dataMemory) {
+        return new ChatClient(applicationContext, beanFactory, cozeAPI, dataMemory, properties);
     }
 
+    @Bean
+    @ConditionalOnMissingBean
+    @Order
+    public DataMemory defaultDataMemory() {
+        return new DefaultDataMemory();
+    }
 }
 
 

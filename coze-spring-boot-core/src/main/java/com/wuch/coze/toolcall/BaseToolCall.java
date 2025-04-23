@@ -1,6 +1,7 @@
 package com.wuch.coze.toolcall;
 
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSON;
 import com.wuch.coze.api.AiResult;
 
 import java.lang.reflect.ParameterizedType;
@@ -8,12 +9,15 @@ import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-public abstract class BaseToolCall<T> implements BiFunction<Map<String, String>, String, String> {
+public abstract class BaseToolCall<T, R> implements BiFunction<String, Map<String, String>, String> {
 
     @Override
-    public String apply(Map<String, String> metaData, String data) {
+    public String apply(String data, Map<String, String> metaData) {
         T t = JSONObject.parseObject(data, getRequestClass());
-        AiResult resp = execute(t, metaData);
+        R resp = call(t, metaData);
+        if (resp instanceof String str) {
+            return str;
+        }
         return JSONObject.toJSONString(resp);
     }
 
@@ -23,11 +27,11 @@ public abstract class BaseToolCall<T> implements BiFunction<Map<String, String>,
      * @param metaData 元数据
      * @return 执行结果
      */
-    protected AiResult execute(T t, Map<String, String> metaData) {
-        return execute(t);
+    protected R call(T t, Map<String, String> metaData) {
+        return call(t);
     }
 
-    protected AiResult execute(T t) {
+    protected R call(T t) {
         return null;
     }
 
