@@ -157,7 +157,7 @@ public class ChatClient{
             sink.complete();
         } else if (CONVERSATION_CHAT_FAILED.equals(event.getEvent()) || ERROR.equals(event.getEvent())) {
             sink.next("很抱歉未能找到您想要的答案，请重新提问！");
-            log.error("聊天失败message：{}, lasetError: {}", event.getMessage(), event.getChat().getLastError());
+            log.error("聊天失败message：{}, lastError: {}", event.getMessage(), event.getChat().getLastError());
         }
     }
 
