@@ -161,6 +161,11 @@ public class ChatClient{
         }
     }
 
+    /**
+     * 执行端插件并返回结果
+     * @param pluginEvent event
+     * @return
+     */
     private Flux<ChatEvent> submitToolOutputs(ChatEvent pluginEvent) {
         List<ToolOutput> toolOutputs = new ArrayList<>();
         for (ChatToolCall callInfo :
