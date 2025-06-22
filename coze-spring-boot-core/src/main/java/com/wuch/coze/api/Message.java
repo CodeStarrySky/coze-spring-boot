@@ -18,9 +18,14 @@ public class Message {
     private String userId = ChatClient.DEFAULT_USER_ID;
 
     /**
-     * 聊天id
+     * 会话id
      */
-    private String chatId = ChatClient.DEFAULT_CHAT_ID;
+    private String conversationId = ChatClient.DEFAULT_CONVERSATION_ID;
+
+    /**
+     * 对话id
+     */
+    private String chatId;
 
     /**
      * 消息内容

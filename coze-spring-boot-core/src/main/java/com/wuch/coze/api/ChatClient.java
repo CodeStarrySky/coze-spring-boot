@@ -2,8 +2,10 @@ package com.wuch.coze.api;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson2.JSON;
+import com.coze.openapi.client.chat.CancelChatReq;
 import com.coze.openapi.client.chat.CreateChatReq;
 import com.coze.openapi.client.chat.SubmitToolOutputsReq;
+import com.coze.openapi.client.chat.model.Chat;
 import com.coze.openapi.client.chat.model.ChatEvent;
 import com.coze.openapi.client.chat.model.ChatToolCall;
 import com.coze.openapi.client.chat.model.ToolOutput;
@@ -26,7 +28,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
 
 import java.lang.reflect.Type;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -38,11 +39,18 @@ public class ChatClient{
 
     private static final Logger log = LoggerFactory.getLogger(ChatClient.class);
 
-    private static final String REDIS_PREKEY = "chat:user:";
+    private static final String CONVERSATION_PREFIX = "coze:conversation:";
+
+    private static final String CHAT_PREFIX = "coze:conversation:chat:";
+
+    public static final String LOCAL_CHAT_ID = "localChatId";
+
+    public static final String LOCAL_CONVERSATION_ID = "localConversationId";
+
+    public static final String LOCAL_USER_ID = "localUserId";
 
     private final ApplicationContext applicationContext;
 
-    private final DefaultListableBeanFactory beanFactory;
 
     private final CozeAPI coze;
 
@@ -52,46 +60,50 @@ public class ChatClient{
 
     public static final String DEFAULT_USER_ID = "SYSTEM_DEFAULT_USER";
 
-    public static final String DEFAULT_CHAT_ID = "DEFAULT_CHAT_ID";
+    public static final String DEFAULT_CONVERSATION_ID = "SYSTEM_DEFAULT_CONVERSATION_ID";
 
-    public Flux<String> chat(com.wuch.coze.api.Message message) {
-        return chat(message.getUserId(), message.getChatId(), message.getText(), message.getMetaData());
+    public Flux<String> chat (String chatId, String message) {
+        return chat(DEFAULT_CONVERSATION_ID, chatId, message);
     }
 
-    public Flux<String> chat(Long userId, String message) {
-        return chat(String.valueOf(userId), message);
+    public Flux<String> chat(String conversationId, String chatId, String message) {
+        return chat(DEFAULT_USER_ID, conversationId, chatId, Message.buildUserQuestionText(message));
     }
 
-    public Flux<String> chat(String userId, String message) {
-        return chat(userId, DEFAULT_CHAT_ID, message, null);
+    public Flux<String> chat(String conversationId, String chatId, String message, Map<String, String> metaData) {
+        return chat(DEFAULT_USER_ID, conversationId, chatId, Message.buildUserQuestionText(message), metaData);
     }
 
-    public Flux<String> chat(String userId, String message, Map<String, String> metaData) {
-        return chat(userId, DEFAULT_CHAT_ID, message, metaData);
+    public Flux<String> chat(String userId, String conversationId, String chatId, String message, Map<String, String> metaData) {
+        return chat(userId, conversationId, chatId, Message.buildUserQuestionText(message), metaData);
     }
 
-    /**
-     * 使用默认用户id聊天
-     * @param message 消息
-     * @return 响应
-     */
-    public Flux<String> chat(String message) {
-        return chat(DEFAULT_USER_ID, DEFAULT_CHAT_ID, message, null);
+    public Flux<String> chat(String chatId, Message message) {
+        return chat(DEFAULT_USER_ID, DEFAULT_CONVERSATION_ID, chatId, message);
     }
 
-    public Flux<String> chat(String userId, String chatId, String message, Map<String, String> metaData) {
-        return chat(userId, chatId, Message.buildUserQuestionText(message), metaData);
+    public Flux<String> chat(String conversationId, String chatId, Message message) {
+        return chat(DEFAULT_USER_ID, conversationId, chatId, message);
     }
 
-    public Flux<String> chat(String userId, String chatId, Message message, Map<String, String> metaData) {
-        return chat(userId, chatId, Collections.singletonList(message), metaData);
+    public Flux<String> chat(String conversationId, String chatId, List<Message> messages, Map<String, String> metaData) {
+        return chat(DEFAULT_USER_ID, conversationId, chatId, messages, metaData);
+    }
+
+    public Flux<String> chat(String userId, String conversationId, String chatId, Message message) {
+        return chat(userId, conversationId, chatId, Collections.singletonList(message), null);
+    }
+
+    public Flux<String> chat(String userId, String conversationId, String chatId, Message message, Map<String, String> metaData) {
+        return chat(userId, conversationId, chatId, Collections.singletonList(message), metaData);
     }
 
 
-    public Flux<String> chat(String userId, String chatId, List<Message> messages, Map<String, String> metaData) {
-        String conversationId = conversation(userId, chatId);
+    public Flux<String> chat(String userId, String conversationId, String chatId, List<Message> messages, Map<String, String> metaData) {
         Map<String, String> defaultMetaData = new HashMap<>();
-        defaultMetaData.put("userId", userId);
+        defaultMetaData.put(LOCAL_USER_ID, userId);
+        defaultMetaData.put(LOCAL_CHAT_ID, chatId);
+        defaultMetaData.put(LOCAL_CONVERSATION_ID, conversationId);
         if (metaData != null) {
             defaultMetaData.putAll(metaData);
         }
@@ -99,7 +111,7 @@ public class ChatClient{
                 CreateChatReq.builder()
                         .botID(properties.getBotId())
                         .userID(userId)
-                        .conversationID(conversationId)
+                        .conversationID(conversation(conversationId))
                         .readTimeout(properties.getReadTimeout())
                         .connectTimeout(properties.getConnectTimeout())
                         .messages(messages)
@@ -112,33 +124,55 @@ public class ChatClient{
 
         return Flux.from(resp).flatMap(this::process).handle(this::content);
     }
-    public String conversation(String userId, String chatId) {
+    private String conversation(String localConversationId) {
         String conversationId = null;
-        if (StringUtils.isNotBlank(userId) || StringUtils.isNotBlank(chatId)) {
-            conversationId = dataMemory.get(getConversationIdKey(userId, chatId));
+        if (StringUtils.isNotBlank(localConversationId)) {
+            conversationId = dataMemory.get(getConversationIdKey(localConversationId));
         }
         if (StringUtils.isBlank(conversationId)) {
-            log.info("用户【{}】进入聊天", userId);
-            conversationId = createConversation(userId, chatId);
+            conversationId = createConversation(localConversationId);
         }
         return conversationId;
     }
 
-    public String createConversation(String userId, String chatId) {
-        String message = "当前对话的用户id(userId)是: " + userId + ",用户信息（userName)是：" +  "WUCH" + "当前日期是: " + LocalDate.now() + ";" ;
-        CreateConversationReq build = CreateConversationReq.builder().botID(properties.getBotId())
-                .messages(Collections.singletonList(Message.buildUserQuestionText(message))).build();
+    public void cancelChat(String chatId) {
+        cancelChat(DEFAULT_CONVERSATION_ID, chatId);
+    }
+
+    public void cancelChat(String conversationId, String chatId) {
+        doCancel(dataMemory.get(getConversationIdKey(conversationId)), dataMemory.get(getChatIdKey(conversationId, chatId)));
+    }
+
+
+
+    private String createConversation(String localConversationId) {
+        CreateConversationReq build = CreateConversationReq.builder().botID(properties.getBotId()).build();
         String conversationId = coze.conversations().create(build).getConversation().getId();
-        dataMemory.add(getConversationIdKey(userId, chatId), conversationId);
+        dataMemory.add(getConversationIdKey(localConversationId), conversationId);
         return conversationId;
     }
 
-    private String getConversationIdKey(String userId, String chatId) {
-        return REDIS_PREKEY + userId + ":" + chatId;
+    public void doCancel(String conversationId, String chatId) {
+        coze.chat().cancel(CancelChatReq.of(conversationId, chatId));
     }
 
-    public void clearConversation(String userId, String chatId, String conversationId) {
-        dataMemory.clear(getConversationIdKey(userId, chatId));
+
+    private String getConversationIdKey(String conversationId) {
+        if (StringUtils.isBlank(conversationId)) {
+            throw new RuntimeException("conversationId is null");
+        }
+        return CONVERSATION_PREFIX + conversationId;
+    }
+
+    private String getChatIdKey(String conversationId, String chatId) {
+        if (StringUtils.isBlank(conversationId) || StringUtils.isBlank(chatId)) {
+            throw new RuntimeException("conversationId or chatId is null");
+        }
+        return CHAT_PREFIX + conversationId + ":" + chatId;
+    }
+
+    public void clearConversation(String localConversationId, String conversationId) {
+        dataMemory.clear(getConversationIdKey(localConversationId));
         ClearConversationReq req = ClearConversationReq.builder().conversationID(conversationId).build();
         coze.conversations().clear(req);
     }
@@ -156,8 +190,13 @@ public class ChatClient{
         } else if (CONVERSATION_CHAT_COMPLETED.equals(event.getEvent())) {
             sink.complete();
         } else if (CONVERSATION_CHAT_FAILED.equals(event.getEvent()) || ERROR.equals(event.getEvent())) {
-            sink.next("很抱歉未能找到您想要的答案，请重新提问！");
+            sink.next(event.getChat().getLastError().getMsg());
             log.error("聊天失败message：{}, lastError: {}", event.getMessage(), event.getChat().getLastError());
+        } else if (CONVERSATION_CHAT_CREATED.equals(event.getEvent())) {
+            Chat chat = event.getChat();
+            assert chat != null;
+            Map<String, String> metaData = chat.getMetaData();
+            dataMemory.add(getChatIdKey(metaData.get(LOCAL_CONVERSATION_ID), metaData.get(LOCAL_CHAT_ID)), chat.getID());
         }
     }
 

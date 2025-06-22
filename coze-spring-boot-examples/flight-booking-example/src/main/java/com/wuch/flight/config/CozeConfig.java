@@ -9,10 +9,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 @Configuration
 public class CozeConfig {
 
-    @Bean
-    public DataMemory redisDataMemory(StringRedisTemplate stringRedisTemplate) {
-        return new RedisDataMemory(stringRedisTemplate);
-    }
+  //  @Bean
+//    public DataMemory redisDataMemory(StringRedisTemplate stringRedisTemplate) {
+//        return new RedisDataMemory(stringRedisTemplate);
+//    }
 
 
 }
