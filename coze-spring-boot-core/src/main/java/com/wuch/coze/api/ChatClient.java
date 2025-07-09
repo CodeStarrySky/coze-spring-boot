@@ -2,6 +2,8 @@ package com.wuch.coze.api;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson2.JSON;
+import com.coze.openapi.client.audio.transcriptions.CreateTranscriptionsReq;
+import com.coze.openapi.client.audio.transcriptions.CreateTranscriptionsResp;
 import com.coze.openapi.client.chat.CancelChatReq;
 import com.coze.openapi.client.chat.CreateChatReq;
 import com.coze.openapi.client.chat.SubmitToolOutputsReq;
@@ -24,9 +26,11 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.ResolvableType;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
 
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.BiFunction;
@@ -137,6 +141,12 @@ public class ChatClient{
 
     public void cancelChat(String chatId) {
         cancelChat(DEFAULT_CONVERSATION_ID, chatId);
+    }
+
+    public String transcriptions(MultipartFile file) throws IOException {
+        CreateTranscriptionsReq req = CreateTranscriptionsReq.builder().fileName(file.getOriginalFilename()).fileBytes(file.getBytes()).build();
+        CreateTranscriptionsResp resp = coze.audio().transcription().create(req);
+        return resp.getText();
     }
 
     public void cancelChat(String conversationId, String chatId) {

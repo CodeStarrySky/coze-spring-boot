@@ -29,6 +29,7 @@
     "@types/nprogress": "^0.2.3",
     "ant-design-vue": "4.x",
     "dayjs": "^1.11.13",
+    "js-audio-recorder": "^1.0.7",
     "less": "^4.2.0",
     "lodash": "^4.17.21",
     "mockjs": "^1.1.0",

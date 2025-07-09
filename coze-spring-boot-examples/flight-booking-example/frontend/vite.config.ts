@@ -14,7 +14,7 @@ export default defineConfig({
         proxy: {
             // with options: http://localhost:5173/api/bar-> http://jsonplaceholder.typicode.com/bar
             '/api': {
-                target: 'http://127.0.0.1:9001',
+                target: 'http://127.0.0.1:9000',
                 changeOrigin: true,
             }
         }

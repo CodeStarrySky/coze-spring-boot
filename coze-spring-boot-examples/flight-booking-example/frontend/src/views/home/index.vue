@@ -16,18 +16,28 @@
             </a-card>
           </div>
           <a-row class="footer" :gutter="10">
-            <a-col :span="20">
+            <a-col :span="24">
               <a-input
                 @keydown.enter="forHelp"
                 v-model:value="question"
                 placeholder="Message"
-              ></a-input>
-            </a-col>
-            <a-col :span="4">
-              <a-button @click="forHelp" :disabled="lock" type="primary"
-                >Send</a-button
               >
+
+                <template #suffix>
+                  <a-button type="link"
+                            :class="{ 'recording': isRecording }"
+                            @mousedown="startRecording"
+                            @mouseleave="stopAndUpload"
+                            :disabled="isUploading"><AudioOutlined /></a-button>
+                </template>
+              </a-input>
+              <br/>
             </a-col>
+            <a-button type="primary" shape="circle" @click="forHelp" >
+              <template #icon>
+                <component :is="buttonIcon" />
+              </template>
+            </a-button>
           </a-row>
         </a-card>
       </a-col>
@@ -72,10 +82,16 @@ import { Icon } from "@iconify/vue";
 import Message from "@/views/home/Message.vue";
 import MessageList from "@/views/home/MessageList.vue";
 import type { MessageItem } from "@/types/message";
-import { chat } from "@/api/service/assistant";
+import { chat,cancel } from "@/api/service/assistant";
 import { getUUID } from "ant-design-vue/lib/vc-dialog/util";
 import { v4 as uuidv4 } from "uuid";
 import { message } from "ant-design-vue";
+import { SendOutlined,PauseCircleOutlined,AudioOutlined } from '@ant-design/icons-vue';
+import axios from 'axios';
+import Recorder from 'js-audio-recorder';
+
+
+let recorder = new Recorder();
 
 const messageInfo: { cur: MessageItem | null; list: MessageItem[] } = reactive({
   cur: null,
@@ -153,13 +169,15 @@ function appendMessage(content: string) {
   scrollBottom();
 }
 
-const chatId = uuidv4();
+let chatId = null;
+const buttonIcon = ref(SendOutlined);
 
 function forHelp() {
   if (lock.value) {
-    message.warn("助手正在生成, 请耐心等候");
+    doCancel();
     return;
   }
+  chatId = uuidv4();
   let userMessage = question.value;
   addMessage("user", userMessage);
   question.value = "";
@@ -168,24 +186,123 @@ function forHelp() {
     {},
   );
   eventSource.onopen = function (event) {
+    lock.value = true;
+    buttonIcon.value = PauseCircleOutlined;
     addMessage("assistant", "");
   };
   eventSource.onmessage = function (event) {
-    lock.value = true;
+    if (!lock.value) {
+      buttonIcon.value = SendOutlined;
+      eventSource.close();
+      return;
+    }
     appendMessage(event.data);
   };
   eventSource.onerror = function () {
     eventSource.close();
     bookings();
     lock.value = false;
+    buttonIcon.value = SendOutlined;
   };
 }
 
+function doCancel() {
+  cancel(chatId).then((res) => {
+    lock.value = false;
+  })
+}
 function bookings() {
   getBookings({}).then((res) => {
     bookingInfo.dataSource = res;
   });
 }
+
+
+const isRecording = ref(false);
+const isUploading = ref(false);
+const audioChunks = ref([]);
+const statusMessage = ref('');
+const mediaRecorder = ref<MediaRecorder | null>(null);
+function startRecording() {
+  if (isUploading.value) return;
+  Recorder.getPermission().then(() => {
+    console.log('录音给权限了');
+  }, (error) => {
+    console.log(`${error.name} : ${error.message}`);
+  });
+  // navigator.mediaDevices.getUserMedia({ audio: true })
+  //     .then(stream => {
+  //       mediaRecorder.value = new MediaRecorder(stream);
+  //       audioChunks.value = [];
+  //
+  //       mediaRecorder.value.ondataavailable = event => {
+  //         if (event.data.size > 0) {
+  //           console.log(event.data);
+  //           audioChunks.value.push(event.data);
+  //         }
+  //       };
+  //
+  //       mediaRecorder.value.onstart = () => {
+  //         isRecording.value = true;
+  //         statusMessage.value = '录音中...';
+  //       };
+  //
+  //       mediaRecorder.value.start();
+  //     })
+  //     .catch(err => {
+  //       console.error('无法访问麦克风:', err);
+  //       alert('请允许访问麦克风');
+  //     });
+
+  recorder.start().then(() => {
+    // 开始录音
+    console.log("开始录音");
+    isRecording.value = true;
+  }, (error) => {
+    // 出错了
+    console.log(`${error.name} : ${error.message}`);
+  });
+}
+
+function stopAndUpload() {
+  if (!isRecording.value) return;
+
+  debugger;
+
+  const blob = recorder.getWAVBlob();
+  console.log('录音完成，Blob size:', blob.size); // 检查是否为 0
+
+  if (blob.size === 0) {
+    statusMessage.value = '录音内容为空，请重新录制';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('audio', blob, 'voice-message.wav');
+
+  isUploading.value = true;
+  statusMessage.value = '发送中...';
+
+  axios.post('/api/assistant/transcriptions', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }).then(res => {
+    statusMessage.value = '发送成功';
+    question.value = res.data;
+    forHelp();
+    setTimeout(() => statusMessage.value = '', 2000);
+  }).catch(err => {
+    console.error(err);
+    statusMessage.value = '发送失败';
+  }).finally(() => {
+    isUploading.value = false;
+  });
+}
+
+
+
+
 
 let __null = PRIMARY_COLOR;
 onMounted(() => {

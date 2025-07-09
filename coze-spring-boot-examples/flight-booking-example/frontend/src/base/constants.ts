@@ -3,7 +3,7 @@ import { computed, h, reactive, ref } from "vue";
 import type { RouteLocationNormalizedLoaded } from "vue-router";
 
 // 2aacb8
-export const PRIMARY_COLOR_DEFAULT = "#17b392";
+export const PRIMARY_COLOR_DEFAULT = "#1743b3";
 
 export const LOCAL_STORAGE_LOCALE = "LOCAL_STORAGE_LOCALE";
 export const LOCAL_STORAGE_THEME = "LOCAL_STORAGE_THEME";
